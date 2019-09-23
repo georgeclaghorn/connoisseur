@@ -38,6 +38,7 @@ class Connoisseur::Client
   # blog - The URL of the blog associated with the key.
   #
   # Returns true or false indicating whether the key is valid for the given blog.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def verify_key_for(blog:)
     @service.verify_key_for(blog: blog)
   end

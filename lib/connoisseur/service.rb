@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "connoisseur/result"
+require "connoisseur/errors"
 
 class Connoisseur::Service
   # Internal: Initialize a Connoisseur service.
@@ -21,7 +22,9 @@ class Connoisseur::Service
   # comment - A Hash of POST parameters describing the comment.
   #
   # Returns a Connoisseur::Result.
-  # Raises Connoisseur::Result::InvalidError if the Akismet API provides an unexpected response.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
+  # Raises Connoisseur::UnexpectedResponse if the Akismet API responds with an
+  #   error status code or invalid body.
   def check(comment)
     Connoisseur::Result.new(post("comment-check", body: comment)).validated
   end
@@ -31,6 +34,7 @@ class Connoisseur::Service
   # comment - A Hash of POST parameters describing the comment.
   #
   # Returns nothing.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def spam!(comment)
     post "submit-spam", body: comment
   end
@@ -40,6 +44,7 @@ class Connoisseur::Service
   # comment - A Hash of POST parameters describing the comment.
   #
   # Returns nothing.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def ham!(comment)
     post "submit-ham", body: comment
   end
@@ -49,6 +54,7 @@ class Connoisseur::Service
   # blog - The URL of the blog associated with the key.
   #
   # Returns true or false indicating whether the key is valid for the given blog.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def verify_key_for(blog:)
     post_without_subdomain("verify-key", body: { key: key, blog: blog }).body == "valid"
   end
@@ -63,13 +69,25 @@ class Connoisseur::Service
 
 
   def post(endpoint, body:)
-    Net::HTTP.post URI("https://#{key}.rest.akismet.com/1.1/#{endpoint}"),
-      URI.encode_www_form(body), headers
+    handle_network_errors do
+      Net::HTTP.post \
+        URI("https://#{key}.rest.akismet.com/1.1/#{endpoint}"), URI.encode_www_form(body), headers
+    end
   end
 
   def post_without_subdomain(endpoint, body:)
-    Net::HTTP.post URI("https://rest.akismet.com/1.1/#{endpoint}"),
-      URI.encode_www_form(body), headers
+    handle_network_errors do
+      Net::HTTP.post \
+        URI("https://rest.akismet.com/1.1/#{endpoint}"), URI.encode_www_form(body), headers
+    end
+  end
+
+  def handle_network_errors
+    yield
+  rescue Net::OpenTimeout
+    raise Connoisseur::Timeout, "Timed out opening connection to Akismet"
+  rescue Net::ReadTimeout
+    raise Connoisseur::Timeout, "Timed out reading response from Akismet"
   end
 
   def headers

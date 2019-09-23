@@ -44,10 +44,7 @@ class Connoisseur::ClientTest < MiniTest::Test
       .with(body: "comment_content=Hello%2C+world%21", headers: { "User-Agent" => "Connoisseur Tests" })
       .to_return(status: 500, body: "false")
 
-    error = assert_raises Connoisseur::Result::InvalidError do
-      @comment.check
-    end
-
+    error = assert_raises(Connoisseur::UnexpectedResponse) { @comment.check }
     assert_equal 'Expected successful response, got 500', error.message
   end
 
@@ -56,10 +53,7 @@ class Connoisseur::ClientTest < MiniTest::Test
       .with(body: "comment_content=Hello%2C+world%21", headers: { "User-Agent" => "Connoisseur Tests" })
       .to_return(status: 200, body: "invalid")
 
-    error = assert_raises Connoisseur::Result::InvalidError do
-      @comment.check
-    end
-
+    error = assert_raises(Connoisseur::UnexpectedResponse) { @comment.check }
     assert_equal 'Expected boolean response body, got "invalid"', error.message
   end
 
@@ -68,11 +62,26 @@ class Connoisseur::ClientTest < MiniTest::Test
       .with(body: "comment_content=Hello%2C+world%21", headers: { "User-Agent" => "Connoisseur Tests" })
       .to_return(status: 200, body: "invalid", headers: { "X-Akismet-Debug-Help" => "We were unable to parse your blog URI" })
 
-    error = assert_raises Connoisseur::Result::InvalidError do
-      @comment.check
-    end
-
+    error = assert_raises(Connoisseur::UnexpectedResponse) { @comment.check }
     assert_equal 'Expected boolean response body, got "invalid" (We were unable to parse your blog URI)', error.message
+  end
+
+  def test_check_encountering_open_timeout
+    stub_request(:post, "https://secret.rest.akismet.com/1.1/comment-check")
+      .with(body: "comment_content=Hello%2C+world%21", headers: { "User-Agent" => "Connoisseur Tests" })
+      .to_raise(Net::OpenTimeout)
+
+    error = assert_raises(Connoisseur::Timeout) { @comment.check }
+    assert_equal "Timed out opening connection to Akismet", error.message
+  end
+
+  def test_check_encountering_read_timeout
+    stub_request(:post, "https://secret.rest.akismet.com/1.1/comment-check")
+      .with(body: "comment_content=Hello%2C+world%21", headers: { "User-Agent" => "Connoisseur Tests" })
+      .to_raise(Net::ReadTimeout)
+
+    error = assert_raises(Connoisseur::Timeout) { @comment.check }
+    assert_equal "Timed out reading response from Akismet", error.message
   end
 
 

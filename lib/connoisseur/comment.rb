@@ -29,7 +29,8 @@ class Connoisseur::Comment
   #   result.valid?
   #
   # Returns a Connoisseur::Result.
-  # Raises Connoisseur::Result::InvalidError if the Akismet API responds unexpectedly.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
+  # Raises Connoisseur::UnexpectedResponse if the Akismet API responds unexpectedly.
   def check
     @service.check(@parameters)
   end
@@ -37,6 +38,7 @@ class Connoisseur::Comment
   # Public: Inform Akismet that the comment should have been marked spam.
   #
   # Returns nothing.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def spam!
     @service.spam!(@parameters)
   end
@@ -44,6 +46,7 @@ class Connoisseur::Comment
   # Public: Inform Akismet that the comment should have been marked ham.
   #
   # Returns nothing.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def ham!
     @service.ham!(@parameters)
   end
@@ -53,6 +56,7 @@ class Connoisseur::Comment
   # spam - A boolean indicating whether the comment should have been marked spam.
   #
   # Returns nothing.
+  # Raises Connoisseur::Timeout if the HTTP request to the Akismet API times out.
   def update!(spam:)
     if spam
       spam!
